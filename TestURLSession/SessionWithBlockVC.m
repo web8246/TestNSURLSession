@@ -60,6 +60,7 @@
     //    [self getWithURL];
     //    [self getWithRequest];
     //    [self post2];
+    [self post3];
 }
 
 - (void)didReceiveMemoryWarning {
@@ -200,15 +201,16 @@
     request.HTTPMethod = @"POST";
     // 4、构造请求参数
     // 4.1、创建字典参数，将参数放入字典中，可防止程序员在主观意识上犯错误，即参数写错。
-    NSDictionary *parametersDict = @{@"apikey":@"1",@"D":@"77",@"or":@"99",@"or":@"99",@"y":@"77"};
+    NSDictionary *parametersDict = @{@"a":@"1",@"D":@"7",@"o":@"99",@"or":@"99",@"y":@"77"};
     // 4.2、遍历字典，以“key=value&”的方式创建参数字符串。
     NSMutableString *parameterString = [NSMutableString string];
     
     for (NSString *key in parametersDict.allKeys) {
         // 拼接字符串
+        NSLog(@"key: %@",key);
         [parameterString appendFormat:@"%@=%@&", key, parametersDict[key]];
     }
-    NSLog(@"parameterString: %@",parameterString);
+    NSLog(@"parameterString2: %@",parameterString);
     // 4.3、截取参数字符串，去掉最后一个“&”，并且将其转成NSData数据类型。
     NSData *parametersData = [[parameterString substringToIndex:parameterString.length - 1] dataUsingEncoding:NSUTF8StringEncoding];
     
@@ -397,6 +399,60 @@
     
 }
 
+
+//用post方式，httpbody為form-data上傳圖片
+- (void)uploadPhotoWithImage:(UIImage *)image success:(void (^)(NSDictionary *dictionary))successBlock fail:(void (^)(NSError *error))failBlock
+{
+    // Build the request body
+    NSString *boundary = @"Happyboundary";
+    NSMutableData *body = [NSMutableData data];
+    NSData *imageData = UIImageJPEGRepresentation(image, 0.7);
+    NSString *key = [NSString stringWithFormat:@""];
+    if (imageData) {
+        [body appendData:[[NSString stringWithFormat:@"--%@\r\n", boundary] dataUsingEncoding:NSUTF8StringEncoding]];
+        [body appendData:[[NSString stringWithFormat:@"Content-Disposition: form-data; name=\"%@\"; filename=\"image.jpg\"\r\n", key] dataUsingEncoding:NSUTF8StringEncoding]];//key就是"image" not image.jpg ,所以這邊可以替換key成名字
+        [body appendData:[@"Content-Type: application/octet-stream\r\n\r\n" dataUsingEncoding:NSUTF8StringEncoding]];
+        [body appendData:imageData];
+        [body appendData:[[NSString stringWithFormat:@"\r\n"] dataUsingEncoding:NSUTF8StringEncoding]];
+    }
+    [body appendData:[[NSString stringWithFormat:@"--%@--\r\n", boundary] dataUsingEncoding:NSUTF8StringEncoding]];
+    
+    // Setup the session
+    NSURLSessionConfiguration *sessionConfiguration = [NSURLSessionConfiguration defaultSessionConfiguration];
+    sessionConfiguration.HTTPAdditionalHeaders = @{
+                                                   @"Authorization" : [@"Bearer " stringByAppendingString:@"Happy Authorization"],
+                                                   @"Content-Type"  : [NSString stringWithFormat:@"multipart/form-data; boundary=%@", boundary]
+                                                   };
+    
+    // Create the session
+    // We can use the delegate to track upload progress
+    NSURLSession *session = [NSURLSession sessionWithConfiguration:sessionConfiguration delegate:nil delegateQueue:nil];
+    
+    // Data uploading task. We could use NSURLSessionUploadTask instead of NSURLSessionDataTask if we needed to support uploads in the background
+    NSURL *url = [NSURL URLWithString:@"http://........."];
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    request.HTTPMethod = @"POST";
+    request.HTTPBody = body;
+    NSURLSessionDataTask *uploadTask = [session dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            NSError *err;
+            NSDictionary *resultDict = [NSJSONSerialization JSONObjectWithData:data options:0 error:&err];
+            if (error == nil) {
+                // Success
+                NSLog(@"URL Session Task Succeeded: HTTP %ld", (long)((NSHTTPURLResponse*)response).statusCode);
+                
+                successBlock(resultDict);
+            }
+            else {
+                // Failure
+                NSLog(@"URL Session Task Failed: %@", [error localizedDescription]);
+                
+                failBlock(error);
+            }
+        });
+    }];
+    [uploadTask resume];
+}
 
 
 /*
